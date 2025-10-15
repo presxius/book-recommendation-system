@@ -27,7 +27,7 @@ class NumpyJSONEncoder(json.JSONEncoder):
         return super().default(obj)
 
 app = Flask(__name__)
-app.secret_key = 'book-recommendation-secret-key-2024'
+app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
 app.json_encoder = NumpyJSONEncoder  # Use custom JSON encoder
 
 # Initialize components
