@@ -71,9 +71,6 @@ class DataProcessor:
         # Step 2: Apply manual fixes for specific known issues
         total_fixed += self._manual_specific_fixes()
         
-        # Step 3: Try advanced encoding techniques
-        self._advanced_encoding_fix()
-        
         print(f"Total encoding fixes applied: {total_fixed}")
         
         # Show remaining issues
@@ -137,12 +134,9 @@ class DataProcessor:
             # Common German words that appear frequently
             'ErzÃ?Â¤hlungen': 'Erzählungen',
             'KÃ?Â¶nig': 'König',
-            'Chroniken': 'Chroniken',
-            'MÃ?Â¤rchen': 'Märchen',
             'FÃ?Â¼r': 'Für',
             'fÃ?Â¼r': 'für',
             'Ã?Â¼ber': 'über',
-            'Ã?Â¤lteste': 'älteste',
         }
         
         fixed_count = 0
@@ -157,128 +151,39 @@ class DataProcessor:
         
         return fixed_count
 
-    def _advanced_encoding_fix(self):
-        """Use more advanced techniques to fix encoding issues"""
-        print("Applying advanced encoding fixes...")
-        
-        if self.books_df is None:
-            return
-        
-        # Method 1: Try to decode and re-encode
-        def fix_encoding_text(text):
-            if not isinstance(text, str) or 'Ã' not in text:
-                return text
-            
-            # Try different encoding combinations
-            try:
-                # If it's double-encoded UTF-8
-                fixed = text.encode('latin-1').decode('utf-8')
-                if 'Ã' not in fixed:
-                    return fixed
-            except:
-                pass
-            
-            try:
-                # Try Windows-1252 to UTF-8
-                fixed = text.encode('latin-1').decode('windows-1252')
-                if 'Ã' not in fixed:
-                    return fixed
-            except:
-                pass
-            
-            return text
-        
-        # Apply to problematic columns
-        for col in ['Book-Title', 'Book-Author']:
-            if col in self.books_df.columns:
-                mask = self.books_df[col].astype(str).str.contains('Ã', na=False)
-                if mask.any():
-                    print(f"Applying advanced encoding fix to {mask.sum()} entries in {col}")
-                    self.books_df.loc[mask, col] = self.books_df.loc[mask, col].apply(fix_encoding_text)
-
     def _show_remaining_encoding_issues(self):
-        """Show remaining encoding issues for debugging"""
+        """Show remaining encoding issues for debugging - safe version"""
         if self.books_df is None:
             return
-
-        # Find titles with remaining encoding artifacts
-        weird_patterns = ['Ã', 'Â', '�', 'ð', '¡', '¢', '?']
-
+        
+        # Safe patterns that won't cause regex issues
+        weird_patterns = ['Ã', 'Â', '�', 'ð', '¡', '¢']
+        
         remaining_issues = {}
         for pattern in weird_patterns:
-            # Escape special regex characters
-            if pattern in ['?', '.', '*', '+', '^', '$', '|', '\\', '(', ')', '[', ']', '{', '}']:
-                escaped_pattern = re.escape(pattern)
-            else:
-                escaped_pattern = pattern
-
-            mask = self.books_df['Book-Title'].astype(str).str.contains(escaped_pattern, na=False, regex=True)
-            count = mask.sum()
+            # Use simple string containment check instead of regex
+            count = 0
+            for title in self.books_df['Book-Title'].astype(str):
+                if pattern in title:
+                    count += 1
             if count > 0:
                 remaining_issues[pattern] = count
-                if count <= 5:  # Show all examples if few
-                    examples = self.books_df[mask]['Book-Title'].head(5).tolist()
-                    print(f"Pattern '{pattern}' found in {count} titles:")
-                    for example in examples:
-                        print(f"  - {example}")
-
+        
         if remaining_issues:
             print(f"\nRemaining encoding issues by pattern:")
             for pattern, count in remaining_issues.items():
                 print(f"  '{pattern}': {count} titles")
-
-            # Show some random problematic titles for analysis (without regex)
-            problematic_titles = []
+            
+            # Show some examples without using problematic patterns in search
+            print(f"\nSample of remaining problematic titles:")
+            sample_count = 0
             for idx, row in self.books_df.iterrows():
+                if sample_count >= 3:
+                    break
                 title = str(row['Book-Title'])
                 if any(pattern in title for pattern in weird_patterns):
-                    problematic_titles.append(title)
-                    if len(problematic_titles) >= 10:
-                        break
-                    
-            print(f"\nSample of remaining problematic titles:")
-            for i, title in enumerate(problematic_titles):
-                print(f"  {i+1}. {title}")
-
-    def test_encoding_fixes(self):
-        """Test method to verify encoding fixes"""
-        test_cases = [
-            'Die LÃ?Â¶win von Aquitanien. Roman.',
-            'Der illustrierte Mann. ErzÃ?Â¤hlungen.',
-            'Der KÃ?Â¶nig in Gelb.',
-            'Die Mars- Chroniken. Roman in ErzÃ?Â¤hlungen.'
-        ]
-        
-        print("\n=== Encoding Fix Test ===")
-        for test_case in test_cases:
-            fixed = self._apply_single_fix(test_case)
-            print(f"Before: {test_case}")
-            print(f"After:  {fixed}")
-            print()
-
-    def _apply_single_fix(self, text):
-        """Apply fixes to a single text string for testing"""
-        if not isinstance(text, str):
-            return text
-        
-        fixes = [
-            (r'Ã\?Â¤', 'ä'),
-            (r'Ã\?Â¶', 'ö'),
-            (r'Ã\?Â¼', 'ü'),
-            (r'Ã\?Â', 'Ü'),
-            (r'Ã\?Â', 'Ä'),
-            (r'Ã\?Â', 'Ö'),
-            (r'Ã\?Â', 'ß'),
-        ]
-        
-        for bad, good in fixes:
-            text = re.sub(bad, good, text)
-        
-        return text
-
-    # ... [REST OF YOUR EXISTING METHODS - keep all your existing methods below] ...
-    # Include all your existing methods like analyze_ratings_distribution, clean_book_title, 
-    # preprocess_data, handle_missing_values, normalize_data, etc.
+                    print(f"  {sample_count + 1}. {title}")
+                    sample_count += 1
 
     def analyze_ratings_distribution(self):
         """Analyze and print rating distribution"""
@@ -321,7 +226,6 @@ class DataProcessor:
             try:
                 title = re.sub(pattern, '', title, flags=re.IGNORECASE)
             except re.error as e:
-                print(f"Regex error with pattern '{pattern}': {e}")
                 continue
         
         # Remove special characters but keep spaces and basic punctuation
@@ -330,26 +234,6 @@ class DataProcessor:
         # Remove extra spaces and return
         title = re.sub(r'\s+', ' ', title).strip()
         return title.lower()
-
-    def standardize_series_titles(self, title):
-        """Standardize common series titles"""
-        title_lower = title.lower()
-        
-        series_replacements = {
-            'harry potter and the': 'harry potter',
-            'harry potter & the': 'harry potter',
-            'hp and the': 'harry potter',
-            'lord of the rings:': 'lord of the rings',
-            'the hobbit:': 'the hobbit',
-            'the chronicles of narnia:': 'the chronicles of narnia',
-            'the hunger games:': 'the hunger games',
-        }
-        
-        for old, new in series_replacements.items():
-            if old in title_lower:
-                title_lower = title_lower.replace(old, new)
-        
-        return title_lower
 
     def deduplicate_books(self):
         """Remove duplicate books based on title and author similarity"""
@@ -638,35 +522,3 @@ class DataProcessor:
         except Exception as e:
             print(f"Error in search deduplication: {e}")
             return results
-
-def preprocess_data_production(self):
-    """Optimized preprocessing for production environment"""
-    print("🔄 Production-optimized preprocessing...")
-    
-    # Handle missing values (essential)
-    self.handle_missing_values()
-    
-    # Use simpler deduplication for production
-    print("Applying fast deduplication...")
-    self.books_df = self.books_df.drop_duplicates(subset=['Book-Title', 'Book-Author'], keep='first')
-    
-    # Normalize ratings
-    self.normalize_data()
-    
-    # Use lighter filtering for production
-    print("Applying production data filtering...")
-    if self.ratings_df is not None and not self.ratings_df.empty:
-        # Less aggressive filtering to keep more data
-        user_rating_counts = self.ratings_df['User-ID'].value_counts()
-        active_users = user_rating_counts[user_rating_counts >= 2].index  # Reduced from 3
-        self.ratings_df = self.ratings_df[self.ratings_df['User-ID'].isin(active_users)]
-        
-        book_rating_counts = self.ratings_df['ISBN'].value_counts()
-        popular_books = book_rating_counts[book_rating_counts >= 2].index  # Reduced from 3
-        self.ratings_df = self.ratings_df[self.ratings_df['ISBN'].isin(popular_books)]
-    
-    # Encode IDs
-    self._encode_ids()
-    
-    print(f"✅ Production preprocessing complete: {len(self.ratings_df)} ratings")
-    return self.ratings_df, self.books_df

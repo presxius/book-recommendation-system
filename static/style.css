@@ -115,9 +115,16 @@ header p {
     color: #333;
 }
 
-.book-info p {
+.book-author {
     color: #666;
     font-size: 0.9em;
+    margin: 5px 0;
+}
+
+.book-year {
+    color: #888;
+    font-size: 0.8em;
+    margin: 2px 0;
 }
 
 .rating-section {
@@ -251,6 +258,14 @@ header p {
     margin-top: 30px;
 }
 
+.search-info {
+    margin-bottom: 15px;
+    padding: 10px;
+    background: #e8f4fd;
+    border-radius: 5px;
+    text-align: center;
+}
+
 @media (max-width: 768px) {
     .container {
         padding: 10px;
@@ -267,47 +282,4 @@ header p {
     .search-section {
         flex-direction: column;
     }
-}
-
-.search-info {
-    margin-bottom: 15px;
-    padding: 10px;
-    background: #e8f4fd;
-    border-radius: 5px;
-    text-align: center;
-}
-
-.book-author {
-    color: #666;
-    font-size: 0.9em;
-    margin: 5px 0;
-}
-
-.book-year {
-    color: #888;
-    font-size: 0.8em;
-    margin: 2px 0;
-}
-
-.book-card {
-    border: 1px solid #ddd;
-    padding: 15px;
-    border-radius: 8px;
-    background: #f9f9f9;
-    transition: transform 0.2s, box-shadow 0.2s;
-    margin-bottom: 10px;
-}
-
-.book-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-}
-
-.duplicate-warning {
-    background: #fff3cd;
-    border: 1px solid #ffeaa7;
-    padding: 8px;
-    margin: 5px 0;
-    border-radius: 4px;
-    font-size: 0.8em;
 }

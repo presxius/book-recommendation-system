@@ -19,7 +19,7 @@ class SVDAutoRec:
         print("Training SVD model...")
         
         # Split data
-        trainset, testset = train_test_split(data, test_size=test_size)
+        trainset, testset = train_test_split(data, test_size=test_size, random_state=42)
         
         # Initialize model with regularization to prevent overfitting
         self.model = SVD(

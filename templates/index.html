@@ -20,47 +20,46 @@
             </div>
 
             <div class="search-section">
-    <input type="text" id="searchInput" placeholder="Cari buku berdasarkan judul atau penulis...">
-    <button onclick="searchBooks()">Cari</button>
-</div>
+                <input type="text" id="searchInput" placeholder="Cari buku berdasarkan judul atau penulis...">
+                <button onclick="searchBooks()">Cari</button>
+            </div>
 
-<div class="book-selection">
-    <h3>Pilih Buku yang Pernah Anda Baca</h3>
-    <div id="searchResults" class="search-results"></div>
-    
-    <div class="popular-books">
-        <h4>Buku Populer</h4>
-        <div class="search-info">
-            <small>Menampilkan buku unik (duplikat telah dihapus)</small>
-        </div>
-        <div id="bookGrid" class="book-grid">
-            {% for book in books %}
-            <div class="book-card" data-isbn="{{ book.ISBN }}">
-                <div class="book-info">
-                    <h5>{{ book['Book-Title'] }}</h5>
-                    <p class="book-author">Oleh: {{ book['Book-Author'] }}</p>
-                    <p class="book-year">Tahun: {{ book['Year-Of-Publication'] }}</p>
+            <div class="book-selection">
+                <h3>Pilih Buku yang Pernah Anda Baca</h3>
+                <div id="searchResults" class="search-results"></div>
+                
+            <div class="popular-books">
+                <h4>Buku Populer</h4>
+                <div class="search-info">
+                    <small>Pilih rating untuk buku yang pernah Anda baca</small>
                 </div>
-                <div class="rating-section">
-                    <select class="rating-select">
-                        <option value="">Pilih rating</option>
-                        <option value="10">⭐️⭐️⭐️⭐️⭐️ (10)</option>
-                        <option value="9">⭐️⭐️⭐️⭐️⭐️ (9)</option>
-                        <option value="8">⭐️⭐️⭐️⭐️ (8)</option>
-                        <option value="7">⭐️⭐️⭐️⭐️ (7)</option>
-                        <option value="6">⭐️⭐️⭐️ (6)</option>
-                        <option value="5">⭐️⭐️⭐️ (5)</option>
-                        <option value="4">⭐️⭐️ (4)</option>
-                        <option value="3">⭐️⭐️ (3)</option>
-                        <option value="2">⭐️ (2)</option>
-                        <option value="1">⭐️ (1)</option>
-                    </select>
+                <div id="bookGrid" class="book-grid">
+                    {% for book in books %}
+                    <div class="book-card" data-isbn="{{ book.ISBN }}">
+                        <div class="book-info">
+                            <h5>{{ book['Book-Title'] }}</h5>
+                            <p class="book-author">Oleh: {{ book['Book-Author'] }}</p>
+                            <p class="book-year">Tahun: {{ book['Year-Of-Publication'] }}</p>
+                        </div>
+                        <div class="rating-section">
+                            <select class="rating-select" onchange="addBookRating('{{ book.ISBN }}', this.value)">
+                                <option value="">Pilih rating</option>
+                                <option value="10">⭐️⭐️⭐️⭐️⭐️ (10)</option>
+                                <option value="9">⭐️⭐️⭐️⭐️⭐️ (9)</option>
+                                <option value="8">⭐️⭐️⭐️⭐️ (8)</option>
+                                <option value="7">⭐️⭐️⭐️⭐️ (7)</option>
+                                <option value="6">⭐️⭐️⭐️ (6)</option>
+                                <option value="5">⭐️⭐️⭐️ (5)</option>
+                                <option value="4">⭐️⭐️ (4)</option>
+                                <option value="3">⭐️⭐️ (3)</option>
+                                <option value="2">⭐️ (2)</option>
+                                <option value="1">⭐️ (1)</option>
+                            </select>
+                        </div>
+                    </div>
+                    {% endfor %}
                 </div>
             </div>
-            {% endfor %}
-        </div>
-    </div>
-</div>
 
             <div class="selected-books">
                 <h3>Buku yang Dipilih</h3>
@@ -80,20 +79,21 @@
         function searchBooks() {
             const query = document.getElementById('searchInput').value;
             if (query.length < 2) return;
-
+        
             fetch(`/search_books?q=${encodeURIComponent(query)}`)
                 .then(response => response.json())
                 .then(books => {
                     const resultsDiv = document.getElementById('searchResults');
                     resultsDiv.innerHTML = '';
-
+                
                     books.forEach(book => {
                         const bookElement = document.createElement('div');
                         bookElement.className = 'book-card';
                         bookElement.innerHTML = `
                             <div class="book-info">
                                 <h5>${book['Book-Title']}</h5>
-                                <p>Oleh: ${book['Book-Author']}</p>
+                                <p class="book-author">Oleh: ${book['Book-Author']}</p>
+                                <p class="book-year">Tahun: ${book['Year-Of-Publication']}</p>
                             </div>
                             <div class="rating-section">
                                 <select class="rating-select" onchange="addBookRating('${book.ISBN}', this.value)">
@@ -116,22 +116,60 @@
                 });
         }
 
+        // FIXED: This function now works for books from ANY section
         function addBookRating(isbn, rating) {
-            if (rating && !selectedBooks[isbn]) {
+            if (rating) {
                 selectedBooks[isbn] = parseInt(rating);
                 updateSelectedBooksList();
+
+                // Also update the rating display in the book card if it exists
+                updateBookCardRating(isbn, rating);
             }
+        }
+
+        function updateBookCardRating(isbn, rating) {
+            // Update rating in search results
+            const searchCards = document.querySelectorAll('#searchResults .book-card');
+            searchCards.forEach(card => {
+                if (card.getAttribute('data-isbn') === isbn) {
+                    const select = card.querySelector('.rating-select');
+                    if (select) select.value = rating;
+                }
+            });
+
+            // Update rating in popular books section
+            const popularCards = document.querySelectorAll('#bookGrid .book-card');
+            popularCards.forEach(card => {
+                if (card.getAttribute('data-isbn') === isbn) {
+                    const select = card.querySelector('.rating-select');
+                    if (select) select.value = rating;
+                }
+            });
         }
 
         function updateSelectedBooksList() {
             const selectedList = document.getElementById('selectedBooksList');
             selectedList.innerHTML = '';
-
+        
             Object.keys(selectedBooks).forEach(isbn => {
+                // Find book title for better display
+                let bookTitle = isbn; // Default to ISBN if title not found
+
+                // Try to find the book title from the page
+                const allCards = document.querySelectorAll('.book-card');
+                allCards.forEach(card => {
+                    if (card.getAttribute('data-isbn') === isbn) {
+                        const titleElement = card.querySelector('h5');
+                        if (titleElement) {
+                            bookTitle = titleElement.textContent;
+                        }
+                    }
+                });
+
                 const bookItem = document.createElement('div');
                 bookItem.className = 'selected-book-item';
                 bookItem.innerHTML = `
-                    <span>${isbn} - Rating: ${selectedBooks[isbn]}/10</span>
+                    <span>${bookTitle} - Rating: ${selectedBooks[isbn]}/10</span>
                     <button onclick="removeBook('${isbn}')">Hapus</button>
                 `;
                 selectedList.appendChild(bookItem);
@@ -141,6 +179,9 @@
         function removeBook(isbn) {
             delete selectedBooks[isbn];
             updateSelectedBooksList();
+
+            // Also clear the rating from the book cards
+            updateBookCardRating(isbn, '');
         }
 
         function getRecommendations() {
@@ -148,11 +189,11 @@
                 alert('Pilih setidaknya satu buku dan beri rating!');
                 return;
             }
-
+        
             const ratings = Object.entries(selectedBooks).map(([isbn, rating]) => [isbn, rating]);
-            
-            document.getElementById('loading').classList.remove('hidden');
 
+            document.getElementById('loading').classList.remove('hidden');
+        
             fetch('/get_recommendations', {
                 method: 'POST',
                 headers: {
@@ -163,9 +204,8 @@
             .then(response => response.json())
             .then(data => {
                 document.getElementById('loading').classList.add('hidden');
-                
+
                 if (data.success) {
-                    // Store recommendations and redirect
                     sessionStorage.setItem('recommendations', JSON.stringify(data.recommendations));
                     window.location.href = '/recommendations';
                 } else {

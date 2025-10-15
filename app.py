@@ -27,8 +27,8 @@ class NumpyJSONEncoder(json.JSONEncoder):
         return super().default(obj)
 
 app = Flask(__name__)
-app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
-app.json_encoder = NumpyJSONEncoder  # Use custom JSON encoder
+app.secret_key = 'book-recommendation-secret-key-2024'
+app.json_encoder = NumpyJSONEncoder
 
 # Initialize components
 data_processor = DataProcessor()
@@ -36,11 +36,11 @@ svd_model = SVDAutoRec()
 recommendation_engine = None
 
 def initialize_system():
-    """Initialize the recommendation system optimized for production"""
+    """Initialize the recommendation system"""
     global recommendation_engine
     
     try:
-        print("🚀 Initializing recommendation system for production...")
+        print("Initializing recommendation system...")
         
         # Load data
         data_loaded = data_processor.load_data(
@@ -50,62 +50,58 @@ def initialize_system():
         )
         
         if not data_loaded:
-            print("❌ Failed to load data")
+            print("Failed to load data")
             return False
         
-        print("✅ Data loaded successfully")
+        print("Data loaded successfully, continuing with preprocessing...")
         
-        # Use the existing preprocessing method (it's working well)
-        print("⚡ Starting data preprocessing...")
-        ratings_df, books_df = data_processor.preprocess_data()  # Use existing method
+        # Preprocess data with error handling
+        try:
+            ratings_df, books_df = data_processor.preprocess_data()
+        except Exception as e:
+            print(f"Error during preprocessing: {e}")
+            print("Attempting to continue with basic processing...")
+            # Basic processing without advanced features
+            data_processor.handle_missing_values()
+            data_processor.normalize_data()
+            if hasattr(data_processor, '_filter_sparse_data'):
+                data_processor._filter_sparse_data()
+            if hasattr(data_processor, '_encode_ids'):
+                data_processor._encode_ids()
+            ratings_df, books_df = data_processor.ratings_df, data_processor.books_df
         
         if ratings_df is None or ratings_df.empty:
-            print("⚠️ No ratings data after preprocessing, using basic mode")
-            # Initialize without model training
-            recommendation_engine = RecommendationEngine(data_processor, None)
-            return True
+            print("No ratings data available after preprocessing")
+            return False
         
-        # Check if we have enough data for training
-        if len(ratings_df) < 1000:  # Minimum threshold
-            print("⚠️ Insufficient data for model training, using basic mode")
-            recommendation_engine = RecommendationEngine(data_processor, None)
-            return True
+        print(f"Data ready: {len(ratings_df)} ratings, {len(books_df)} books")
         
-        print("🎯 Training SVD model...")
+        # Get data in Surprise format
         surprise_data = data_processor.get_surprise_data()
         
         if surprise_data is None:
-            print("⚠️ Could not prepare training data, using basic mode")
-            recommendation_engine = RecommendationEngine(data_processor, None)
-            return True
+            print("Failed to prepare Surprise data")
+            return False
         
-        # Train with production-optimized parameters
-        try:
-            # Use faster training parameters for production
-            svd_model.n_epochs = 10  # Reduced from 20 for faster training
-            svd_model.n_factors = 50  # Reduced from 100 for lower memory
-            
-            rmse, mae = svd_model.train(surprise_data)
-            print(f"✅ Model trained! RMSE: {rmse:.4f}, MAE: {mae:.4f}")
-            
-            # Initialize with trained model
-            recommendation_engine = RecommendationEngine(data_processor, svd_model)
-            print("🎉 System fully initialized with trained model!")
-            
-        except Exception as training_error:
-            print(f"⚠️ Model training failed: {training_error}")
-            print("🔄 Falling back to basic recommendation mode")
-            recommendation_engine = RecommendationEngine(data_processor, None)
+        # Train SVD model
+        print("Starting model training...")
+        rmse, mae = svd_model.train(surprise_data)
+        print(f"Model training completed! RMSE: {rmse:.4f}, MAE: {mae:.4f}")
+        
+        # Initialize recommendation engine
+        recommendation_engine = RecommendationEngine(data_processor, svd_model)
+        
+        print("System initialized successfully!")
+        print(f"Available users: {len(data_processor.user_ids)}")
+        print(f"Available books: {len(data_processor.book_ids)}")
         
         return True
         
     except Exception as e:
-        print(f"❌ Error initializing system: {e}")
+        print(f"Error initializing system: {e}")
         import traceback
         traceback.print_exc()
-        # Even if initialization fails, create basic engine to prevent crashes
-        recommendation_engine = RecommendationEngine(data_processor, None)
-        return True
+        return False
 
 @app.route('/')
 def index():
@@ -137,6 +133,9 @@ def get_recommendations():
             return jsonify({'error': 'No ratings provided'}), 400
         
         print(f"Received {len(user_ratings)} ratings from user")
+        
+        if recommendation_engine is None:
+            return jsonify({'error': 'Recommendation engine not initialized'}), 500
         
         # Get recommendations
         recommendations = recommendation_engine.hybrid_recommendations(
@@ -180,14 +179,14 @@ def show_recommendations():
 
 @app.route('/search_books')
 def search_books():
-    """Search books by title or author with deduplication"""
+    """Search books by title or author"""
     try:
         query = request.args.get('q', '').lower().strip()
         
         if not query or len(query) < 2:
             return jsonify([])
         
-        # Use deduplicated search
+        # Search in books dataframe
         matching_books = data_processor.search_books_deduplicated(query, 20)
         
         if matching_books.empty:
@@ -215,7 +214,7 @@ def search_books():
                 'Publisher': str(book.get('Publisher', 'Unknown Publisher'))
             })
             
-            if len(results) >= 15:  # Limit results
+            if len(results) >= 15:
                 break
         
         return jsonify(results)
@@ -243,10 +242,21 @@ def book_details(isbn):
 @app.route('/health')
 def health_check():
     """Health check endpoint"""
-    system_ready = recommendation_engine is not None
-    model_trained = system_ready and hasattr(recommendation_engine.svd_model, 'is_trained') and recommendation_engine.svd_model.is_trained
+    system_ready = recommendation_engine is not None and svd_model.is_trained
     return jsonify({
         'status': 'ready' if system_ready else 'initializing',
-        'model_trained': model_trained,
-        'system_initialized': system_ready
+        'users_loaded': len(data_processor.user_ids) if hasattr(data_processor, 'user_ids') else 0,
+        'books_loaded': len(data_processor.book_ids) if hasattr(data_processor, 'book_ids') else 0,
+        'model_trained': svd_model.is_trained
     })
+
+if __name__ == '__main__':
+    # Initialize the system when starting the app
+    print("Starting Book Recommendation System...")
+    if initialize_system():
+        print("Application starting on http://localhost:5000")
+        app.run(debug=True, host='0.0.0.0', port=5000)
+    else:
+        print("Failed to initialize the recommendation system!")
+        print("Starting application in limited mode...")
+        app.run(debug=True, host='0.0.0.0', port=5000)
