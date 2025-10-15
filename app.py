@@ -250,17 +250,3 @@ def health_check():
         'model_trained': model_trained,
         'system_initialized': system_ready
     })
-
-if __name__ == '__main__':
-    # Initialize the system when starting the app
-    print("Starting Book Recommendation System...")
-    if initialize_system():
-        print("Application starting on http://localhost:5000")
-        port = int(os.environ.get('PORT', 5000))
-        app.run(debug=True, host='0.0.0.0', port=port)
-    else:
-        print("Failed to initialize the recommendation system!")
-        print("Starting application in limited mode...")
-        # Start anyway but with limited functionality
-        port = int(os.environ.get('PORT', 5000))
-        app.run(debug=True, host='0.0.0.0', port=port)
