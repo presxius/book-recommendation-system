@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Search Books</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Book Search</h1>
+            <p>Search through our extensive book database</p>
+        </header>
+
+        <nav class="navbar">
+            <a href="/" class="nav-link">Home</a>
+            <a href="/recommend" class="nav-link">Get Recommendations</a>
+            <a href="/search" class="nav-link active">Search Books</a>
+        </nav>
+
+        <main class="main-content">
+            <div class="search-form">
+                <h2>Search Books</h2>
+                <form method="POST">
+                    <div class="form-group">
+                        <label for="query">Search by Title or Author:</label>
+                        <input type="text" id="query" name="query" required 
+                               placeholder="Enter book title or author name..."
+                               value="{{ query if query }}">
+                    </div>
+                    <div class="form-group">
+                        <label for="max_results">Maximum Results:</label>
+                        <select id="max_results" name="max_results">
+                            <option value="10">10</option>
+                            <option value="20" selected>20</option>
+                            <option value="50">50</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Search Books</button>
+                </form>
+            </div>
+
+            {% if results %}
+            <div class="search-results">
+                <h2>Search Results for "{{ query }}"</h2>
+                <p class="results-count">{{ results|length }} books found</p>
+                
+                <div class="books-grid">
+                    {% for book in results %}
+                    <div class="book-card">
+                        <div class="book-info">
+                            <h3 class="book-title">{{ book.title }}</h3>
+                            <p class="book-author">by {{ book.author }}</p>
+                            <p class="book-meta">Published: {{ book.year }} | Publisher: {{ book.publisher }}</p>
+                            <div class="rating">
+                                {% if book.avg_rating != 'No ratings' %}
+                                <span class="avg-rating">Average Rating: {{ book.avg_rating }}/10 ({{ book.num_ratings }} ratings)</span>
+                                {% else %}
+                                <span class="no-rating">No ratings yet</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
+            {% if query and not results %}
+            <div class="no-results">
+                <h3>No books found for "{{ query }}"</h3>
+                <p>Try different search terms or browse our recommendations.</p>
+            </div>
+            {% endif %}
+        </main>
+    </div>
+</body>
+</html>

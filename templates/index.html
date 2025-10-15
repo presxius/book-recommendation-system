@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistem Rekomendasi Buku Digital - SVD</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Sistem Rekomendasi Buku Digital</h1>
+            <p>Penerapan Collaborative Filtering dengan Metode Singular Value Decomposition (SVD)</p>
+        </header>
+
+        <div class="main-content">
+            <div class="welcome-section">
+                <h2>Selamat Datang!</h2>
+                <p>Pilih beberapa buku yang pernah Anda baca atau sukai untuk mendapatkan rekomendasi personal.</p>
+            </div>
+
+            <div class="search-section">
+    <input type="text" id="searchInput" placeholder="Cari buku berdasarkan judul atau penulis...">
+    <button onclick="searchBooks()">Cari</button>
+</div>
+
+<div class="book-selection">
+    <h3>Pilih Buku yang Pernah Anda Baca</h3>
+    <div id="searchResults" class="search-results"></div>
+    
+    <div class="popular-books">
+        <h4>Buku Populer</h4>
+        <div class="search-info">
+            <small>Menampilkan buku unik (duplikat telah dihapus)</small>
+        </div>
+        <div id="bookGrid" class="book-grid">
+            {% for book in books %}
+            <div class="book-card" data-isbn="{{ book.ISBN }}">
+                <div class="book-info">
+                    <h5>{{ book['Book-Title'] }}</h5>
+                    <p class="book-author">Oleh: {{ book['Book-Author'] }}</p>
+                    <p class="book-year">Tahun: {{ book['Year-Of-Publication'] }}</p>
+                </div>
+                <div class="rating-section">
+                    <select class="rating-select">
+                        <option value="">Pilih rating</option>
+                        <option value="10">⭐️⭐️⭐️⭐️⭐️ (10)</option>
+                        <option value="9">⭐️⭐️⭐️⭐️⭐️ (9)</option>
+                        <option value="8">⭐️⭐️⭐️⭐️ (8)</option>
+                        <option value="7">⭐️⭐️⭐️⭐️ (7)</option>
+                        <option value="6">⭐️⭐️⭐️ (6)</option>
+                        <option value="5">⭐️⭐️⭐️ (5)</option>
+                        <option value="4">⭐️⭐️ (4)</option>
+                        <option value="3">⭐️⭐️ (3)</option>
+                        <option value="2">⭐️ (2)</option>
+                        <option value="1">⭐️ (1)</option>
+                    </select>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+            <div class="selected-books">
+                <h3>Buku yang Dipilih</h3>
+                <div id="selectedBooksList"></div>
+                <button onclick="getRecommendations()" class="btn-primary">Dapatkan Rekomendasi</button>
+            </div>
+
+            <div id="loading" class="loading hidden">
+                <p>Sedang memproses rekomendasi...</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let selectedBooks = {};
+
+        function searchBooks() {
+            const query = document.getElementById('searchInput').value;
+            if (query.length < 2) return;
+
+            fetch(`/search_books?q=${encodeURIComponent(query)}`)
+                .then(response => response.json())
+                .then(books => {
+                    const resultsDiv = document.getElementById('searchResults');
+                    resultsDiv.innerHTML = '';
+
+                    books.forEach(book => {
+                        const bookElement = document.createElement('div');
+                        bookElement.className = 'book-card';
+                        bookElement.innerHTML = `
+                            <div class="book-info">
+                                <h5>${book['Book-Title']}</h5>
+                                <p>Oleh: ${book['Book-Author']}</p>
+                            </div>
+                            <div class="rating-section">
+                                <select class="rating-select" onchange="addBookRating('${book.ISBN}', this.value)">
+                                    <option value="">Pilih rating</option>
+                                    <option value="10">⭐️⭐️⭐️⭐️⭐️ (10)</option>
+                                    <option value="9">⭐️⭐️⭐️⭐️⭐️ (9)</option>
+                                    <option value="8">⭐️⭐️⭐️⭐️ (8)</option>
+                                    <option value="7">⭐️⭐️⭐️⭐️ (7)</option>
+                                    <option value="6">⭐️⭐️⭐️ (6)</option>
+                                    <option value="5">⭐️⭐️⭐️ (5)</option>
+                                    <option value="4">⭐️⭐️ (4)</option>
+                                    <option value="3">⭐️⭐️ (3)</option>
+                                    <option value="2">⭐️ (2)</option>
+                                    <option value="1">⭐️ (1)</option>
+                                </select>
+                            </div>
+                        `;
+                        resultsDiv.appendChild(bookElement);
+                    });
+                });
+        }
+
+        function addBookRating(isbn, rating) {
+            if (rating && !selectedBooks[isbn]) {
+                selectedBooks[isbn] = parseInt(rating);
+                updateSelectedBooksList();
+            }
+        }
+
+        function updateSelectedBooksList() {
+            const selectedList = document.getElementById('selectedBooksList');
+            selectedList.innerHTML = '';
+
+            Object.keys(selectedBooks).forEach(isbn => {
+                const bookItem = document.createElement('div');
+                bookItem.className = 'selected-book-item';
+                bookItem.innerHTML = `
+                    <span>${isbn} - Rating: ${selectedBooks[isbn]}/10</span>
+                    <button onclick="removeBook('${isbn}')">Hapus</button>
+                `;
+                selectedList.appendChild(bookItem);
+            });
+        }
+
+        function removeBook(isbn) {
+            delete selectedBooks[isbn];
+            updateSelectedBooksList();
+        }
+
+        function getRecommendations() {
+            if (Object.keys(selectedBooks).length === 0) {
+                alert('Pilih setidaknya satu buku dan beri rating!');
+                return;
+            }
+
+            const ratings = Object.entries(selectedBooks).map(([isbn, rating]) => [isbn, rating]);
+            
+            document.getElementById('loading').classList.remove('hidden');
+
+            fetch('/get_recommendations', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ ratings: ratings })
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('loading').classList.add('hidden');
+                
+                if (data.success) {
+                    // Store recommendations and redirect
+                    sessionStorage.setItem('recommendations', JSON.stringify(data.recommendations));
+                    window.location.href = '/recommendations';
+                } else {
+                    alert('Error: ' + data.error);
+                }
+            })
+            .catch(error => {
+                document.getElementById('loading').classList.add('hidden');
+                alert('Terjadi kesalahan: ' + error);
+            });
+        }
+
+        // Add event listener for Enter key in search
+        document.getElementById('searchInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                searchBooks();
+            }
+        });
+    </script>
+</body>
+</html>
