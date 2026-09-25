@@ -1,0 +1,9 @@
+{
+  "rmse": 0.7208596161194215,
+  "mae": 0.5588479131012978,
+  "training_time": 89.82915115356445,
+  "avg_prediction_time": 0.009116500150412321,
+  "test_samples": 76769,
+  "prediction_test_samples": 200,
+  "last_updated": "2025-12-11T19:58:59.281472"
+}

@@ -1,262 +1,520 @@
-from flask import Flask, render_template, request, jsonify, session
+from flask import Flask, render_template, request, jsonify, session, redirect, url_for
 import os
 import json
 import numpy as np
-import pandas as pd
-from models.data_processor import DataProcessor
-from models.svd_model import SVDAutoRec
-from models.recommendation_engine import RecommendationEngine
-
-# Custom JSON encoder class
-class NumpyJSONEncoder(json.JSONEncoder):
-    def default(self, obj):
-        if isinstance(obj, (np.integer, np.int32, np.int64)):
-            return int(obj)
-        elif isinstance(obj, (np.floating, np.float32, np.float64)):
-            return float(obj)
-        elif isinstance(obj, np.ndarray):
-            return obj.tolist()
-        elif isinstance(obj, pd.Series):
-            return obj.tolist()
-        elif isinstance(obj, pd.DataFrame):
-            return obj.to_dict('records')
-        elif isinstance(obj, np.bool_):
-            return bool(obj)
-        elif pd.isna(obj):
-            return None
-        return super().default(obj)
+from data_preprocessing import DataPreprocessor
+from model_training import ModelTrainer
+from recommender import BookRecommender
+from utils import format_metrics, NumpyEncoder
+import joblib
+from datetime import datetime
 
 app = Flask(__name__)
-app.secret_key = 'book-recommendation-secret-key-2024'
-app.json_encoder = NumpyJSONEncoder
+app.secret_key = 'book_recommendation_secret_key'
+app.json_encoder = NumpyEncoder
 
-# Initialize components
-data_processor = DataProcessor()
-svd_model = SVDAutoRec()
-recommendation_engine = None
+# Global variables
+data_processor = None
+model_trainer = None
+recommender = None
+books_df = None
 
 def initialize_system():
     """Initialize the recommendation system"""
-    global recommendation_engine
+    global data_processor, model_trainer, recommender, books_df
     
     try:
-        print("Initializing recommendation system...")
+        # Initialize data processor
+        data_processor = DataPreprocessor()
         
-        # Load data
+        # Load and preprocess data
         data_loaded = data_processor.load_data(
-            'data/books.csv',
-            'data/ratings.csv', 
-            'data/users.csv'
+            'data/Books.csv',
+            'data/Users.csv', 
+            'data/Ratings.csv'
         )
         
         if not data_loaded:
-            print("Failed to load data")
+            print("❌ Failed to load data")
             return False
         
-        print("Data loaded successfully, continuing with preprocessing...")
+        # Preprocess data
+        books_df = data_processor.preprocess_books()
+        data_processor.preprocess_users()
+        ratings_df = data_processor.preprocess_ratings()
         
-        # Preprocess data with error handling
-        try:
-            ratings_df, books_df = data_processor.preprocess_data()
-        except Exception as e:
-            print(f"Error during preprocessing: {e}")
-            print("Attempting to continue with basic processing...")
-            # Basic processing without advanced features
-            data_processor.handle_missing_values()
-            data_processor.normalize_data()
-            if hasattr(data_processor, '_filter_sparse_data'):
-                data_processor._filter_sparse_data()
-            if hasattr(data_processor, '_encode_ids'):
-                data_processor._encode_ids()
-            ratings_df, books_df = data_processor.ratings_df, data_processor.books_df
+        # Initialize model trainer
+        model_trainer = ModelTrainer(data_processor)
         
-        if ratings_df is None or ratings_df.empty:
-            print("No ratings data available after preprocessing")
-            return False
+        # Check if model exists, otherwise train
+        model_path = 'models/svd_model.pkl'
+        if os.path.exists(model_path):
+            print("Loading existing model...")
+            model = joblib.load(model_path)
+            model_trainer.model = model
+            
+            # Load metrics
+            metrics = load_metrics()
+            if metrics:
+                model_trainer.metrics = metrics
+                print("✅ Metrics file loaded successfully")
+        else:
+            print("Training new model...")
+            model = model_trainer.train_model(ratings_df)
+            # Simpan metrics setelah training awal
+            if model_trainer.metrics:
+                save_metrics(model_trainer.metrics)
         
-        print(f"Data ready: {len(ratings_df)} ratings, {len(books_df)} books")
+        # Initialize recommender
+        preprocessed_data = data_processor.get_preprocessed_data()
+        recommender = BookRecommender(
+            model_trainer.model,
+            books_df,
+            preprocessed_data['user_encoder'],
+            preprocessed_data['book_encoder']
+        )
         
-        # Get data in Surprise format
-        surprise_data = data_processor.get_surprise_data()
+        # Test search functionality during initialization
+        print("🧪 Testing search functionality...")
+        test_results = recommender.search_books("test", 2)
+        print(f"✅ Search test returned {len(test_results)} results")
         
-        if surprise_data is None:
-            print("Failed to prepare Surprise data")
-            return False
-        
-        # Train SVD model
-        print("Starting model training...")
-        rmse, mae = svd_model.train(surprise_data)
-        print(f"Model training completed! RMSE: {rmse:.4f}, MAE: {mae:.4f}")
-        
-        # Initialize recommendation engine
-        recommendation_engine = RecommendationEngine(data_processor, svd_model)
-        
-        print("System initialized successfully!")
-        print(f"Available users: {len(data_processor.user_ids)}")
-        print(f"Available books: {len(data_processor.book_ids)}")
-        
+        print("✅ System initialized successfully")
         return True
         
     except Exception as e:
-        print(f"Error initializing system: {e}")
+        print(f"❌ Error initializing system: {e}")
         import traceback
         traceback.print_exc()
         return False
 
+def save_metrics(metrics):
+    """Save metrics to JSON file"""
+    try:
+        os.makedirs('models', exist_ok=True)
+        
+        metrics_serializable = {}
+        for key, value in metrics.items():
+            if hasattr(value, 'item'):
+                metrics_serializable[key] = value.item()
+            elif isinstance(value, (np.floating, np.integer)):
+                metrics_serializable[key] = float(value)
+            else:
+                metrics_serializable[key] = value
+        
+        metrics_serializable['last_updated'] = datetime.now().isoformat()
+        
+        with open('models/metrics.json', 'w') as f:
+            json.dump(metrics_serializable, f, indent=2)
+        print("✅ Metrics saved successfully")
+        return True
+    except Exception as e:
+        print(f"❌ Error saving metrics: {e}")
+        return False
+
+def load_metrics():
+    """Load metrics from JSON file"""
+    try:
+        metrics_path = 'models/metrics.json'
+        if os.path.exists(metrics_path):
+            with open(metrics_path, 'r') as f:
+                return json.load(f)
+        return None
+    except Exception as e:
+        print(f"Error loading metrics: {e}")
+        return None
+
+# ROUTES
 @app.route('/')
 def index():
-    """Home page with book selection"""
+    return render_template('index.html')
+
+# app.py - Perbaiki endpoint search_books dengan debugging
+@app.route('/search', methods=['POST'])
+def search_books():
+    """Search for books"""
     try:
-        # Get popular books for initial selection
-        popular_books = data_processor.get_popular_books(100)
+        query = request.json.get('query', '')
+        print(f"🔍 Search query received: '{query}'")
         
-        if popular_books.empty:
-            books_list = []
-            print("No popular books available")
-        else:
-            books_list = popular_books[['ISBN', 'Book-Title', 'Book-Author', 'Year-Of-Publication']].to_dict('records')
-            print(f"Loaded {len(books_list)} popular books for selection")
+        if not query or not recommender:
+            print("❌ No query or recommender not available")
+            return jsonify({'results': []})
         
-        return render_template('index.html', books=books_list)
+        results = recommender.search_books(query)
+        print(f"✅ Search found {len(results)} results for query: '{query}'")
+        
+        # Debug: print first few results if any
+        if results:
+            for i, result in enumerate(results[:3]):
+                print(f"  {i+1}. {result['title']} by {result['author']}")
+        
+        return jsonify({'results': results})
     
     except Exception as e:
-        print(f"Error in index route: {e}")
-        return render_template('index.html', books=[])
-
-@app.route('/get_recommendations', methods=['POST'])
-def get_recommendations():
-    """Get recommendations based on user ratings"""
-    try:
-        user_ratings = request.json.get('ratings', [])
-        
-        if not user_ratings:
-            return jsonify({'error': 'No ratings provided'}), 400
-        
-        print(f"Received {len(user_ratings)} ratings from user")
-        
-        if recommendation_engine is None:
-            return jsonify({'error': 'Recommendation engine not initialized'}), 500
-        
-        # Get recommendations
-        recommendations = recommendation_engine.hybrid_recommendations(
-            user_ratings, 
-            n=10
-        )
-        
-        print(f"Generated {len(recommendations)} recommendations")
-        
-        # Convert all numpy/pandas types to native Python types for JSON serialization
-        serializable_recommendations = []
-        for rec in recommendations:
-            serializable_rec = {
-                'ISBN': str(rec['ISBN']),
-                'Title': str(rec['Title']),
-                'Author': str(rec['Author']),
-                'Year': int(rec['Year']) if pd.notna(rec['Year']) else 2000,
-                'Publisher': str(rec['Publisher']),
-                'Predicted_Rating': float(rec['Predicted_Rating'])
-            }
-            serializable_recommendations.append(serializable_rec)
-        
-        # Store user ratings in session
-        session['user_ratings'] = user_ratings
-        
-        return jsonify({
-            'success': True,
-            'recommendations': serializable_recommendations
-        })
-        
-    except Exception as e:
-        print(f"Error getting recommendations: {e}")
+        print(f"❌ Error in search_books: {e}")
         import traceback
         traceback.print_exc()
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error': str(e), 'results': []})
 
-@app.route('/recommendations')
-def show_recommendations():
-    """Display recommendations page"""
-    return render_template('recommendations.html')
+# app.py - Perbaiki route /recommend untuk handle recommendations dengan lebih baik
 
-@app.route('/search_books')
-def search_books():
-    """Search books by title or author"""
+@app.route('/recommend', methods=['GET', 'POST'])
+def get_recommendations():
+    """Get book recommendations - VERSI DIPERBAIKI"""
     try:
-        query = request.args.get('q', '').lower().strip()
-        
-        if not query or len(query) < 2:
-            return jsonify([])
-        
-        # Search in books dataframe
-        matching_books = data_processor.search_books_deduplicated(query, 20)
-        
-        if matching_books.empty:
-            return jsonify([])
-        
-        # Convert to serializable format
-        results = []
-        seen_titles = set()
-        
-        for _, book in matching_books.iterrows():
-            # Create a unique identifier for the book (title + author)
-            book_key = f"{book.get('Book-Title', '').lower()}_{book.get('Book-Author', '').lower()}"
+        if request.method == 'POST':
+            # Get user ratings from form
+            user_ratings = []
+            rated_books = {}
             
-            # Skip if we've already seen this book
-            if book_key in seen_titles:
-                continue
-                
-            seen_titles.add(book_key)
+            for key, value in request.form.items():
+                if key.startswith('rating_'):
+                    isbn = key.replace('rating_', '')
+                    rating = int(value)
+                    book_title = request.form.get(f'title_{isbn}', '')
+                    
+                    if rating > 0:
+                        rated_books[isbn] = {
+                            'isbn': isbn,
+                            'rating': rating,
+                            'title': book_title
+                        }
             
-            results.append({
-                'ISBN': str(book['ISBN']),
-                'Book-Title': str(book.get('Book-Title', 'Unknown Title')),
-                'Book-Author': str(book.get('Book-Author', 'Unknown Author')),
-                'Year-Of-Publication': int(book.get('Year-Of-Publication', 2000)) if pd.notna(book.get('Year-Of-Publication')) else 2000,
-                'Publisher': str(book.get('Publisher', 'Unknown Publisher'))
-            })
+            # Convert dictionary back to list
+            user_ratings = list(rated_books.values())
             
-            if len(results) >= 15:
-                break
+            # Lengkapi judul buku yang missing
+            user_ratings = complete_book_titles(user_ratings)
+            
+            # Store ratings in session
+            session['user_ratings'] = user_ratings
+            
+            print(f"📝 User ratings saved: {len(user_ratings)} books")
+            for rating in user_ratings:
+                print(f"  - {rating['title']}: {rating['rating']}/5")
+            
+        else:
+            # GET request - get ratings from session
+            user_ratings = session.get('user_ratings', [])
+            user_ratings = complete_book_titles(user_ratings)
         
-        return jsonify(results)
+        # Get recommendations
+        if not recommender:
+            return render_template('recommend.html', 
+                                recommendations=[], 
+                                user_ratings=user_ratings,
+                                error="System not initialized")
+        
+        print(f"🎯 Getting recommendations based on {len(user_ratings)} user ratings...")
+        
+        # PANGGIL REKOMMENDER YANG SUDAH DIPERBAIKI
+        recommendations = recommender.get_user_recommendations(user_ratings, 12)
+        
+        # Sort recommendations by predicted rating (highest first)
+        recommendations.sort(key=lambda x: x['predicted_rating'], reverse=True)
+        
+        print(f"✅ Successfully generated {len(recommendations)} recommendations")
+        print(f"🔍 Recommendation differences:")
+        for i, rec in enumerate(recommendations[:5]):
+            print(f"  {i+1}. {rec['title']} - {rec['predicted_rating']}/5 (confidence: {rec['confidence_level']})")
+        
+        return render_template('recommend.html', 
+                             recommendations=recommendations,
+                             user_ratings=user_ratings)
     
     except Exception as e:
-        print(f"Error searching books: {e}")
-        return jsonify([])
+        print(f"❌ Error in get_recommendations: {e}")
+        import traceback
+        traceback.print_exc()
+        return render_template('recommend.html', 
+                             recommendations=[], 
+                             user_ratings=session.get('user_ratings', []),
+                             error=f"Error generating recommendations: {str(e)}")
 
-@app.route('/book_details/<isbn>')
-def book_details(isbn):
-    """Get detailed information about a book"""
+def complete_book_titles(user_ratings):
+    """Lengkapi judul buku yang missing dari books_df berdasarkan ISBN"""
+    if not user_ratings or not hasattr(data_processor, 'books_df'):
+        return user_ratings
+    
     try:
-        book_info = data_processor.books_df[data_processor.books_df['ISBN'] == isbn]
+        completed_ratings = []
+        for rating in user_ratings:
+            isbn = rating['isbn']
+            current_title = rating.get('title', '')
+            
+            if not current_title or current_title == 'Unknown Book':
+                book_match = data_processor.books_df[data_processor.books_df['ISBN'] == isbn]
+                if not book_match.empty:
+                    new_title = book_match.iloc[0]['Book-Title']
+                    rating['title'] = new_title
+                else:
+                    rating['title'] = f"Book (ISBN: {isbn[:10]}...)"
+            
+            completed_ratings.append(rating)
         
-        if book_info.empty:
-            return jsonify({'error': 'Book not found'}), 404
+        return completed_ratings
         
-        book_data = book_info.iloc[0].to_dict()
-        return jsonify(book_data)
+    except Exception as e:
+        return user_ratings
+
+@app.route('/reset_session')
+def reset_session():
+    """Reset user session - clear all ratings"""
+    try:
+        # Clear user ratings from session
+        if 'user_ratings' in session:
+            old_count = len(session['user_ratings'])
+            session.pop('user_ratings')
+            print(f"Session reset: cleared {old_count} ratings")
+        else:
+            print("Session reset: no ratings to clear")
+        
+        # Optional: clear other session data if needed
+        # session.clear()
+        
+        # Redirect back to recommendations page with success message
+        return redirect(url_for('get_recommendations', reset='success'))
     
     except Exception as e:
-        print(f"Error getting book details: {e}")
-        return jsonify({'error': 'Internal server error'}), 500
+        print(f"Error resetting session: {e}")
+        return redirect(url_for('get_recommendations', reset='error'))
 
-@app.route('/health')
-def health_check():
-    """Health check endpoint"""
-    system_ready = recommendation_engine is not None and svd_model.is_trained
-    return jsonify({
-        'status': 'ready' if system_ready else 'initializing',
-        'users_loaded': len(data_processor.user_ids) if hasattr(data_processor, 'user_ids') else 0,
-        'books_loaded': len(data_processor.book_ids) if hasattr(data_processor, 'book_ids') else 0,
-        'model_trained': svd_model.is_trained
-    })
+# app.py - Perbaiki fungsi train() dan pastikan data_stats selalu terkirim
+@app.route('/train', methods=['GET', 'POST'])
+def train():
+    """Train or retrain the model - SEKALIGUS MENAMPILKAN METRICS"""
+    try:
+        # Load metrics terlebih dahulu
+        metrics = load_metrics()
+        formatted_metrics = format_metrics(metrics) if metrics else {}
+        
+        # PASTIKAN data_stats SELALU ADA - panggil fungsi get_data_statistics()
+        data_stats = get_data_statistics()
+        
+        if request.method == 'POST':
+            force_retrain = request.form.get('force_retrain') == 'true'
+            
+            if not data_processor:
+                return render_template('train.html', 
+                                     metrics=formatted_metrics,
+                                     data_stats=data_stats,
+                                     error="Data processor not initialized")
+            
+            ratings_df = data_processor.preprocess_ratings()
+            model_trainer.train_model(ratings_df, force_retrain=force_retrain)
+            
+            # Simpan metrics setelah training
+            if model_trainer.metrics:
+                save_metrics(model_trainer.metrics)
+                # Update metrics yang akan ditampilkan
+                metrics = model_trainer.metrics
+                formatted_metrics = format_metrics(metrics)
+            
+            # Update data statistik setelah training
+            data_stats = get_data_statistics()
+            
+            # Update recommender
+            preprocessed_data = data_processor.get_preprocessed_data()
+            global recommender
+            recommender = BookRecommender(
+                model_trainer.model,
+                books_df,
+                preprocessed_data['user_encoder'],
+                preprocessed_data['book_encoder']
+            )
+            
+            return render_template('train.html', 
+                                 metrics=formatted_metrics,
+                                 data_stats=data_stats,
+                                 message="Model trained successfully!")
+        
+        # GET request - show training page dengan metrics terbaru
+        return render_template('train.html', 
+                             metrics=formatted_metrics,
+                             data_stats=data_stats,
+                             message="Model metrics loaded" if metrics else "No metrics available")
+    
+    except Exception as e:
+        print(f"Error in train route: {e}")
+        # PASTIKAN data_stats juga dikirim saat error
+        data_stats = get_data_statistics()
+        return render_template('train.html', 
+                             metrics={}, 
+                             data_stats=data_stats,
+                             error=f"Training failed: {str(e)}")
+
+def get_data_statistics():
+    """Get data statistics for display - PASTIKAN FUNGSI INI SELALU RETURN DICT"""
+    try:
+        if data_processor and data_processor.books_df is not None:
+            stats = {
+                'books_count': len(data_processor.books_df),
+                'users_count': len(data_processor.users_df) if data_processor.users_df is not None else 0,
+                'ratings_count': len(data_processor.ratings_df) if data_processor.ratings_df is not None else 0
+            }
+            
+            if data_processor.ratings_df is not None and not data_processor.ratings_df.empty:
+                stats.update({
+                    'min_rating': float(data_processor.ratings_df['Book-Rating'].min()),
+                    'max_rating': float(data_processor.ratings_df['Book-Rating'].max()),
+                    'avg_rating': float(data_processor.ratings_df['Book-Rating'].mean().round(2))
+                })
+            else:
+                stats.update({
+                    'min_rating': 1.0,
+                    'max_rating': 5.0,
+                    'avg_rating': 3.0
+                })
+            
+            print(f"Data statistics: {stats}")  # Debug print
+            return stats
+        else:
+            # Return default values jika data_processor belum diinisialisasi
+            default_stats = {
+                'books_count': 0,
+                'users_count': 0,
+                'ratings_count': 0,
+                'min_rating': 1.0,
+                'max_rating': 5.0,
+                'avg_rating': 3.0
+            }
+            print(f"Using default statistics: {default_stats}")  # Debug print
+            return default_stats
+            
+    except Exception as e:
+        print(f"Error getting data statistics: {e}")
+        # Return default values jika ada error
+        return {
+            'books_count': 0,
+            'users_count': 0,
+            'ratings_count': 0,
+            'min_rating': 1.0,
+            'max_rating': 5.0,
+            'avg_rating': 3.0
+        }
+    
+@app.route('/api/recommend', methods=['POST'])
+def api_recommend():
+    try:
+        data = request.json
+        user_ratings = data.get('ratings', [])
+        
+        if not recommender:
+            return jsonify({'error': 'Recommender not initialized'})
+        
+        recommendations = recommender.get_user_recommendations(user_ratings, 10)
+        return jsonify({'recommendations': recommendations})
+    
+    except Exception as e:
+        return jsonify({'error': str(e)})
 
 if __name__ == '__main__':
-    # Initialize the system when starting the app
-    print("Starting Book Recommendation System...")
-    if initialize_system():
-        print("Application starting on http://localhost:5000")
+    print("🚀 Initializing Book Recommendation System...")
+    success = initialize_system()
+    
+    if success:
+        print("✅ System initialized successfully")
         app.run(debug=True, host='0.0.0.0', port=5000)
-    else:
-        print("Failed to initialize the recommendation system!")
-        print("Starting application in limited mode...")
-        app.run(debug=True, host='0.0.0.0', port=5000)
+
+# app.py - Tambahkan fungsi untuk mendapatkan data statistik
+@app.route('/train', methods=['GET', 'POST'])
+def train():
+    """Train or retrain the model - SEKALIGUS MENAMPILKAN METRICS"""
+    try:
+        # Load metrics terlebih dahulu (untuk GET request dan POST request setelah training)
+        metrics = load_metrics()
+        formatted_metrics = format_metrics(metrics) if metrics else {}
+        
+        # Dapatkan data statistik untuk ditampilkan
+        data_stats = get_data_statistics()
+        
+        if request.method == 'POST':
+            force_retrain = request.form.get('force_retrain') == 'true'
+            
+            if not data_processor:
+                return jsonify({'error': 'Data processor not initialized'})
+            
+            ratings_df = data_processor.preprocess_ratings()
+            model_trainer.train_model(ratings_df, force_retrain=force_retrain)
+            
+            # Simpan metrics setelah training
+            if model_trainer.metrics:
+                save_metrics(model_trainer.metrics)
+                # Update metrics yang akan ditampilkan
+                metrics = model_trainer.metrics
+                formatted_metrics = format_metrics(metrics)
+            
+            # Update data statistik setelah training
+            data_stats = get_data_statistics()
+            
+            # Update recommender
+            preprocessed_data = data_processor.get_preprocessed_data()
+            global recommender
+            recommender = BookRecommender(
+                model_trainer.model,
+                books_df,
+                preprocessed_data['user_encoder'],
+                preprocessed_data['book_encoder']
+            )
+            
+            return render_template('train.html', 
+                                 metrics=formatted_metrics,
+                                 data_stats=data_stats,
+                                 message="Model trained successfully!")
+        
+        # GET request - show training page dengan metrics terbaru
+        return render_template('train.html', 
+                             metrics=formatted_metrics,
+                             data_stats=data_stats,
+                             message="Model metrics loaded" if metrics else "No metrics available")
+    
+    except Exception as e:
+        return render_template('train.html', 
+                             metrics={}, 
+                             data_stats={},
+                             error=f"Training failed: {str(e)}")
+
+def get_data_statistics():
+    """Get data statistics for display"""
+    try:
+        if data_processor and data_processor.books_df is not None:
+            stats = {
+                'books_count': len(data_processor.books_df),
+                'users_count': len(data_processor.users_df) if data_processor.users_df is not None else 0,
+                'ratings_count': len(data_processor.ratings_df) if data_processor.ratings_df is not None else 0
+            }
+            
+            if data_processor.ratings_df is not None and not data_processor.ratings_df.empty:
+                stats.update({
+                    'min_rating': float(data_processor.ratings_df['Book-Rating'].min()),
+                    'max_rating': float(data_processor.ratings_df['Book-Rating'].max()),
+                    'avg_rating': float(data_processor.ratings_df['Book-Rating'].mean().round(2))
+                })
+            else:
+                stats.update({
+                    'min_rating': 1.0,
+                    'max_rating': 5.0,
+                    'avg_rating': 3.0
+                })
+            
+            return stats
+        else:
+            return {
+                'books_count': 0,
+                'users_count': 0,
+                'ratings_count': 0,
+                'min_rating': 1.0,
+                'max_rating': 5.0,
+                'avg_rating': 3.0
+            }
+    except Exception as e:
+        print(f"Error getting data statistics: {e}")
+        return {
+            'books_count': 0,
+            'users_count': 0,
+            'ratings_count': 0,
+            'min_rating': 1.0,
+            'max_rating': 5.0,
+            'avg_rating': 3.0
+        }

@@ -1,0 +1,445 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8">
+        <h1>Sistem Rekomendasi Buku</h1>
+        <p class="lead">Rating Buku Yang Udah Kamu Baca Buat Dapet Personalisasi Rekomendasi</p>
+        
+        <div class="card">
+            <div class="card-header">
+                <h5>Cari dan Rating Buku</h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <input type="text" id="searchInput" class="form-control" placeholder="Mulai cari judul buku atau nama penulis...">
+                    <div class="form-text">
+                        <i  class="fas fa-info-circle"></i>Pencarian akan dimulai otomatis selagi kamu mengetik. Coba "Harry Potter", "Stephen King", dll.
+                    </div>
+                </div>
+                
+                <div id="searchResults" class="mt-3">
+                    <!-- Default empty state -->
+                    <div class="text-center text-muted py-4 search-empty-state">
+                        <i class="fas fa-search fa-2x mb-3"></i>
+                        <p>Ketik di kolom pencarian untuk mulai mencari buku...</p>
+                    </div>
+                </div>
+                
+                <form id="ratingForm" method="POST" action="{{ url_for('get_recommendations') }}" class="mt-4">
+                    <div id="ratedBooks">
+                        <h6>Buku Yang Kamu Rating:</h6>
+                        <div id="ratedBooksList"></div>
+                    </div>
+                    <button type="submit" class="btn btn-success mt-3">
+                        <i class="fas fa-star"></i> Dapetin Rekomendasi
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h5>How it works</h5>
+            </div>
+            <div class="card-body">
+                <ol>
+                    <li>Cari buku yang pernah kamu baca</li>
+                    <li>Rating mereka dari 1-5</li>
+                    <li>Dapet Personalisasi Rekomendasi</li>
+                    <li>Temukan buku baru yang kamu suka!</li>
+                </ol>
+                
+                <div class="alert alert-info">
+                    <strong>Skala Rating (1-5):</strong><br>
+                    ⭐ - Jelek<br>
+                    ⭐⭐ - OK<br> 
+                    ⭐⭐⭐ - Bagus<br>
+                    ⭐⭐⭐⭐ - Bagus Banget!<br>
+                    ⭐⭐⭐⭐⭐ - AMBAGUSSS!!!
+                </div>
+                
+                <div class="alert alert-warning">
+                    <strong>Search Tips:</strong><br>
+                    • Ketik untuk pencarian secara instan<br>
+                    • Coba beberapa judul atau nama penulis<br>
+                    • Saat mengetik hasilnya akan langsung keluar
+                </div>
+                
+                <p><small>© 2025 Ambaca.</small></p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// TAMBAHKAN DI AWAL SCRIPT
+// Pastikan semua elemen dinamis menggunakan font yang benar
+function applyBookFonts() {
+    // Apply fonts to dynamically created elements
+    const titles = document.querySelectorAll('.search-book-title, .card-title, h1, h2, h3, h4, h5, h6');
+    titles.forEach(el => {
+        el.style.fontFamily = "'Merriweather', serif";
+    });
+    
+    const bodies = document.querySelectorAll('p, span, div:not(.card-title):not(.search-book-title)');
+    bodies.forEach(el => {
+        if (!el.classList.contains('badge')) {
+            el.style.fontFamily = "'Open Sans', sans-serif";
+        }
+    });
+}
+
+// Object untuk menyimpan buku yang sudah di-rate (mencegah duplikat)
+const ratedBooksMap = new Map();
+
+// Auto-search functionality
+let searchTimeout;
+
+document.getElementById('searchInput').addEventListener('input', function(e) {
+    const query = this.value.trim();
+    clearTimeout(searchTimeout);
+    
+    if (query.length === 0) {
+        showEmptySearchState();
+        return;
+    }
+    
+    if (query.length < 2) {
+        showSearchMessage('Please enter at least 2 characters', 'info');
+        return;
+    }
+    
+    // Show loading state
+    showSearchLoading(query);
+    
+    // Debounce search to avoid too many requests
+    searchTimeout = setTimeout(() => {
+        performSearch(query);
+    }, 300);
+});
+
+// Also support Enter key for accessibility
+document.getElementById('searchInput').addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') {
+        const query = this.value.trim();
+        if (query.length >= 2) {
+            clearTimeout(searchTimeout);
+            performSearch(query);
+        }
+    }
+});
+
+function performSearch(query) {
+    console.log(`Searching for: "${query}"`);
+    
+    fetch('{{ url_for("search_books") }}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({query: query})
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return response.json();
+    })
+    .then(data => {
+        console.log('Search response:', data);
+        
+        if (data.error) {
+            showSearchMessage(`Search error: ${data.error}`, 'error');
+            return;
+        }
+        
+        const results = data.results || [];
+        displaySearchResults(results, query);
+    })
+    .catch(error => {
+        console.error('Search error:', error);
+        showSearchMessage('Error searching books. Please try again.', 'error');
+    });
+}
+
+function displaySearchResults(results, query) {
+    const resultsDiv = document.getElementById('searchResults');
+    
+    if (results.length > 0) {
+        let html = `
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h6 class="mb-0" style="font-family: 'Merriweather', serif; color: #5D4E37;">
+                    <i class="fas fa-search me-2"></i>
+                    Found ${results.length} books for "${query}"
+                </h6>
+                <small class="text-muted" style="font-family: 'Open Sans', sans-serif;">Select a rating for each book</small>
+            </div>
+        `;
+        
+        results.forEach(book => {
+            const coverHtml = book.has_cover ? 
+                `<img src="${book.cover_url}" 
+                      alt="Cover of ${book.title}"
+                      class="search-book-cover img-fluid rounded"
+                      onerror="this.onerror=null; this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                 <div class="search-book-cover-placeholder d-none">
+                     <div class="no-cover-placeholder-small bg-light rounded w-100 h-100 d-flex flex-column align-items-center justify-content-center">
+                         <i class="fas fa-book text-muted"></i>
+                         <small class="text-muted mt-1" style="font-family: 'Open Sans', sans-serif;">No Cover</small>
+                     </div>
+                 </div>` :
+                `<div class="search-book-cover-placeholder">
+                     <div class="no-cover-placeholder-small bg-light rounded w-100 h-100 d-flex flex-column align-items-center justify-content-center">
+                         <i class="fas fa-book text-muted"></i>
+                         <small class="text-muted mt-1" style="font-family: 'Open Sans', sans-serif;">No Cover</small>
+                     </div>
+                 </div>`;
+            
+            html += `
+            <div class="card mb-3 search-result-card">
+                <div class="card-body">
+                    <div class="row align-items-start">
+                        <div class="col-auto">
+                            <div class="search-book-cover-container">
+                                ${coverHtml}
+                            </div>
+                        </div>
+                        <div class="col">
+                            <!-- Book Title -->
+                            <h6 class="card-title mb-1 search-book-title" style="font-family: 'Merriweather', serif; color: #5D4E37;">${book.title}</h6>
+                            
+                            <!-- Author -->
+                            <p class="card-text text-muted small mb-2" style="font-family: 'Open Sans', sans-serif;">
+                                <i class="fas fa-user-edit"></i> by ${book.author}
+                            </p>
+                            
+                            <!-- Detail buku -->
+                            <div class="book-details-container mb-3">
+                                <div class="book-detail-item">
+                                    <span class="detail-label" style="font-family: 'Lora', serif;">Release Year:</span>
+                                    <span class="detail-value" style="font-family: 'Open Sans', sans-serif;">${book.year}</span>
+                                </div>
+                                <div class="book-detail-item">
+                                    <span class="detail-label" style="font-family: 'Lora', serif;">ISBN:</span>
+                                    <span class="detail-value isbn-value" style="font-family: 'Courier New', monospace;">${book.isbn}</span>
+                                </div>
+                                <div class="book-detail-item">
+                                    <span class="detail-label" style="font-family: 'Lora', serif;">Publisher:</span>
+                                    <span class="detail-value" style="font-family: 'Open Sans', sans-serif;">${book.publisher}</span>
+                                </div>
+                            </div>
+                            
+                            <!-- Rating Select -->
+                            <div class="rating-select-container">
+                                <select class="form-select form-select-sm rating-select" data-isbn="${book.isbn}" data-title="${book.title}" style="font-family: 'Open Sans', sans-serif;">
+                                    <option value="0">Pilih rating (1-5)</option>
+                                    <option value="1">1 - Jelek</option>
+                                    <option value="2">2 - OK</option >
+                                    <option value="3">3 - Bagus</option>
+                                    <option value="4">4 - Bagus Banget</option>
+                                    <option value="5">5 - AMBAGUSSS!!!</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            `;
+        });
+        
+        resultsDiv.innerHTML = html;
+        
+        // Apply fonts to new elements
+        applyBookFonts();
+        
+        // Add event listeners to rating selects
+        document.querySelectorAll('.rating-select').forEach(select => {
+            select.addEventListener('change', function() {
+                const isbn = this.getAttribute('data-isbn');
+                const title = this.getAttribute('data-title');
+                const ratingValue = this.value;
+                
+                if (ratingValue !== '0') {
+                    addRatedBook(isbn, title, this.options[this.selectedIndex].text);
+                    // Show success feedback
+                    showTemporaryMessage(`Added rating for "${title}"`, 'success');
+                } else {
+                    removeRatedBook(isbn);
+                }
+            });
+        });
+        
+        // Handle image errors for search results
+        setTimeout(() => {
+            const searchCovers = document.querySelectorAll('.search-book-cover');
+            searchCovers.forEach(img => {
+                img.addEventListener('error', function() {
+                    this.style.display = 'none';
+                    const placeholder = this.nextElementSibling;
+                    if (placeholder && placeholder.classList.contains('search-book-cover-placeholder')) {
+                        placeholder.classList.remove('d-none');
+                        placeholder.classList.add('d-flex');
+                    }
+                });
+            });
+        }, 100);
+        
+    } else {
+        showSearchMessage(`No books found matching "${query}". Try a different search term.`, 'warning');
+    }
+}
+
+function showEmptySearchState() {
+    const resultsDiv = document.getElementById('searchResults');
+    resultsDiv.innerHTML = `
+        <div class="text-center text-muted py-4 search-empty-state">
+            <i class="fas fa-search fa-2x mb-3"></i>
+            <p style="font-family: 'Lora', serif; font-size: 1.1rem;">Start typing above to search for books</p>
+            <small class="text-muted" style="font-family: 'Open Sans', sans-serif;">Results will appear here automatically</small>
+        </div>
+    `;
+}
+
+function showSearchLoading(query) {
+    const resultsDiv = document.getElementById('searchResults');
+    resultsDiv.innerHTML = `
+        <div class="text-center py-4">
+            <div class="spinner-border text-primary spinner-border-sm" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-2 text-muted" style="font-family: 'Open Sans', sans-serif;">Searching for "${query}"...</p>
+        </div>
+    `;
+}
+
+function showSearchMessage(message, type = 'info') {
+    const resultsDiv = document.getElementById('searchResults');
+    const alertClass = type === 'error' ? 'alert-danger' : type === 'warning' ? 'alert-warning' : 'alert-info';
+    const icon = type === 'error' ? 'exclamation-triangle' : type === 'warning' ? 'search' : 'info-circle';
+    
+    resultsDiv.innerHTML = `
+        <div class="alert ${alertClass} text-center py-4">
+            <i class="fas fa-${icon} fa-2x mb-3"></i>
+            <p class="mb-0" style="font-family: 'Open Sans', sans-serif;">${message}</p>
+        </div>
+    `;
+}
+
+function showTemporaryMessage(message, type = 'success') {
+    const alertClass = type === 'success' ? 'alert-success' : 'alert-info';
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `alert ${alertClass} alert-dismissible fade show position-fixed`;
+    messageDiv.style.cssText = 'top: 20px; right: 20px; z-index: 1050; min-width: 300px; font-family: "Open Sans", sans-serif;';
+    messageDiv.innerHTML = `
+        <i class="fas fa-${type === 'success' ? 'check' : 'info'}-circle me-2"></i>
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    
+    document.body.appendChild(messageDiv);
+    
+    // Auto remove after 3 seconds
+    setTimeout(() => {
+        if (messageDiv.parentNode) {
+            messageDiv.remove();
+        }
+    }, 3000);
+}
+
+function addRatedBook(isbn, title, ratingText) {
+    const ratedBooksList = document.getElementById('ratedBooksList');
+    
+    // Update atau tambah ke Map
+    ratedBooksMap.set(isbn, {
+        title: title,
+        rating: ratingText.split(' - ')[0],
+        ratingText: ratingText
+    });
+    
+    updateRatedBooksDisplay();
+    updateHiddenFormInputs();
+}
+
+function removeRatedBook(isbn) {
+    // Hapus dari Map
+    ratedBooksMap.delete(isbn);
+    updateRatedBooksDisplay();
+    updateHiddenFormInputs();
+}
+
+function updateRatedBooksDisplay() {
+    const ratedBooksList = document.getElementById('ratedBooksList');
+    
+    if (ratedBooksMap.size === 0) {
+        ratedBooksList.innerHTML = '<p class="text-muted small" style="font-family: \'Open Sans\', sans-serif;">Belom ada buku yang dirating. Cari dan rating beberapa buku.</p>';
+        return;
+    }
+    
+    let html = '<div class="mt-2">';
+    ratedBooksMap.forEach((book, isbn) => {
+        html += `
+        <div class="alert alert-info alert-dismissible fade show mb-2" role="alert">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <strong class="small" style="font-family: 'Merriweather', serif;">${book.title}</strong><br>
+                    <small style="font-family: 'Open Sans', sans-serif;">Rating: ${book.ratingText}</small>
+                </div>
+                <button type="button" class="btn-close btn-close-sm" onclick="removeRatedBook('${isbn}')"></button>
+            </div>
+        </div>
+        `;
+    });
+    html += '</div>';
+    
+    ratedBooksList.innerHTML = html;
+}
+
+function updateHiddenFormInputs() {
+    const ratingForm = document.getElementById('ratingForm');
+    
+    // Hapus semua input hidden sebelumnya
+    const existingInputs = ratingForm.querySelectorAll('input[type="hidden"]');
+    existingInputs.forEach(input => input.remove());
+    
+    // Tambahkan input hidden baru untuk setiap buku yang di-rate
+    ratedBooksMap.forEach((book, isbn) => {
+        // Input untuk rating
+        const ratingInput = document.createElement('input');
+        ratingInput.type = 'hidden';
+        ratingInput.name = `rating_${isbn}`;
+        ratingInput.value = book.rating;
+        ratingForm.appendChild(ratingInput);
+        
+        // Input untuk judul buku
+        const titleInput = document.createElement('input');
+        titleInput.type = 'hidden';
+        titleInput.name = `title_${isbn}`;
+        titleInput.value = book.title;
+        ratingForm.appendChild(titleInput);
+    });
+}
+
+// Initialize display
+updateRatedBooksDisplay();
+
+// Focus on search input when page loads & apply fonts
+document.addEventListener('DOMContentLoaded', function() {
+    const searchInput = document.getElementById('searchInput');
+    if (searchInput) {
+        searchInput.focus();
+    }
+    
+    // Apply fonts to all elements on page load
+    applyBookFonts();
+    
+    // Mark body as fonts loaded
+    document.body.classList.add('fonts-loaded');
+    document.body.style.opacity = '1';
+});
+</script>
+{% endblock %}

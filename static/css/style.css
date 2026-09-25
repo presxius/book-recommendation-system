@@ -1,0 +1,1004 @@
+@import url('https://fonts.googleapis.com/css2?family=Lora:ital@0;1&family=Merriweather:wght@400;700&family=Open+Sans:wght@400;600&display=swap');
+
+body {
+    opacity: 0;
+    transition: opacity 0.3s ease-in;
+}
+
+body.fonts-loaded {
+    opacity: 1;
+}
+
+body {
+  font-family: 'Merriweather', 'Lora', 'Open Sans', serif;
+  background-color: #FFF8E7; /* tema buku */
+  color: #2B2B2B;
+  line-height: 1.6;
+}
+
+
+/* ========================================== */
+/* Search page specific styles */
+.search-results-grid {
+    display: grid;
+    gap: 1rem;
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+}
+
+.search-result-card {
+    background: white;
+    border-radius: 8px;
+    overflow: hidden;
+    transition: all 0.3s ease;
+}
+
+.search-result-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+/* Book cover styles for search results */
+.search-book-cover-container {
+    position: relative;
+    flex-shrink: 0;
+}
+
+.search-book-cover {
+    transition: transform 0.3s ease;
+}
+
+.search-book-cover:hover {
+    transform: scale(1.05);
+}
+
+.no-cover-placeholder-small {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    transition: all 0.3s ease;
+}
+
+.search-result-card:hover .no-cover-placeholder-small {
+    background: linear-gradient(135deg, #e9ecef 0%, #dee2e6 100%);
+}
+
+/* Book meta information styling */
+.book-meta-info {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border-left: 4px solid #007bff;
+    transition: all 0.3s ease;
+}
+
+.search-result-card:hover .book-meta-info {
+    background: linear-gradient(135deg, #e9ecef 0%, #dee2e6 100%);
+    border-left-color: #0056b3;
+}
+
+/* Text styles for search results */
+.search-book-title {
+    font-weight: 600;
+    line-height: 1.3;
+    margin-bottom: 0.5rem;
+    color: #2c3e50;
+}
+
+.search-book-author {
+    color: #6c757d;
+    font-size: 0.9rem;
+    margin-bottom: 0.25rem;
+}
+
+.search-book-details {
+    color: #6c757d;
+    font-size: 0.8rem;
+    margin-bottom: 0.75rem;
+}
+
+/* Rating select styles */
+.rating-select-container {
+    position: relative;
+}
+
+.rating-select {
+    background-color: white;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    padding: 0.375rem 0.75rem;
+    transition: all 0.2s ease;
+}
+
+.rating-select:focus {
+    border-color: #007bff;
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}
+
+.rating-select option {
+    padding: 0.5rem;
+}
+
+/* Loading states for search */
+.search-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+}
+
+.search-loading .spinner-border {
+    width: 3rem;
+    height: 3rem;
+}
+
+/* Empty state styling */
+.search-empty-state {
+    text-align: center;
+    padding: 3rem 1rem;
+    color: #6c757d;
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border-radius: 12px;
+    border: 2px dashed #dee2e6;
+}
+
+.search-empty-state i {
+    font-size: 4rem;
+    margin-bottom: 1rem;
+    opacity: 0.5;
+}
+
+/* Auto-search input styling */
+.auto-search-input {
+    border: 2px solid #e9ecef;
+    transition: all 0.3s ease;
+}
+
+.auto-search-input:focus {
+    border-color: #007bff;
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.15);
+}
+
+/* Responsive design improvements */
+@media (max-width: 768px) {
+    .search-results-grid {
+        grid-template-columns: 1fr;
+        gap: 0.75rem;
+    }
+    
+    .search-book-cover-container {
+        width: 70px;
+        height: 90px;
+    }
+    
+    .search-book-cover-placeholder {
+        width: 70px;
+        height: 90px;
+    }
+    
+    .book-meta-info {
+        padding: 0.375rem;
+        font-size: 0.8rem;
+    }
+}
+
+@media (max-width: 576px) {
+    .search-result-card .row {
+        flex-direction: column;
+        text-align: center;
+    }
+    
+    .search-result-card .col-auto {
+        margin-bottom: 1rem;
+    }
+    
+    .search-book-cover-container {
+        width: 100px;
+        height: 120px;
+        margin: 0 auto;
+    }
+    
+    .search-book-cover-placeholder {
+        width: 100px;
+        height: 120px;
+        margin: 0 auto;
+    }
+    
+    .rating-select {
+        width: 100%;
+        max-width: none;
+    }
+    
+    .book-meta-info {
+        text-align: left;
+        margin: 0.5rem 0;
+    }
+}
+
+/* Animation for search results */
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.search-result-card {
+    animation: fadeInUp 0.5s ease-out;
+}
+
+/* Stagger animation for multiple results */
+.search-result-card:nth-child(1) { animation-delay: 0.1s; }
+.search-result-card:nth-child(2) { animation-delay: 0.2s; }
+.search-result-card:nth-child(3) { animation-delay: 0.3s; }
+.search-result-card:nth-child(4) { animation-delay: 0.4s; }
+.search-result-card:nth-child(5) { animation-delay: 0.5s; }
+
+/* Print styles for search results */
+@media print {
+    .search-result-card {
+        break-inside: avoid;
+        border: 1px solid #ddd;
+        box-shadow: none;
+    }
+    
+    .search-book-cover-container {
+        display: none;
+    }
+    
+    .rating-select {
+        display: none;
+    }
+}
+
+/* Focus styles for accessibility */
+.search-input-group:focus-within {
+    border-color: #007bff;
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}
+
+/* ISBN badge styling */
+.isbn-badge {
+    font-family: 'Courier New', monospace;
+    background-color: #e9ecef;
+    color: #495057;
+    border: 1px solid #ced4da;
+}
+
+/* Meta information icons */
+.meta-icon {
+    width: 16px;
+    text-align: center;
+    margin-right: 0.25rem;
+    color: #6c757d;
+}
+
+/* ==========================================
+   BOOK THEME CUSTOMIZATION - COMPLETE VERSION
+   Tambahkan di bagian paling bawah style.css
+   ========================================== */
+
+/* Global Typography - Base */
+* {
+    font-family: 'Open Sans', sans-serif;
+}
+
+body {
+    font-family: 'Open Sans', sans-serif !important;
+    color: #4A4A4A;
+    background: linear-gradient(135deg, #FFF8E7 0%, #F5EEDC 100%);
+    line-height: 1.6;
+}
+
+/* Headings - Serif untuk kesan klasik */
+h1, h2, h3, h4, h5, h6,
+.h1, .h2, .h3, .h4, .h5, .h6 {
+    font-family: 'Merriweather', serif !important;
+    color: #5D4E37;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+}
+
+h1 { font-size: 2.2rem; }
+h2 { font-size: 1.9rem; }
+h3 { font-size: 1.6rem; }
+h4 { font-size: 1.4rem; }
+h5 { font-size: 1.2rem; }
+h6 { font-size: 1.05rem; }
+
+/* Paragraph & Text */
+p, span, div, li, td, th {
+    font-family: 'Open Sans', sans-serif;
+    color: #4A4A4A;
+}
+
+.lead {
+    font-family: 'Lora', serif !important;
+    color: #6F6356;
+    font-size: 1.25rem;
+    font-weight: 400;
+    line-height: 1.7;
+}
+
+.text-muted {
+    color: #8D7B68 !important;
+    font-family: 'Open Sans', sans-serif;
+}
+
+/* Small text */
+small, .small {
+    font-family: 'Open Sans', sans-serif;
+    font-size: 0.875rem;
+}
+
+/* Strong & Bold */
+strong, b, .fw-bold {
+    font-family: 'Lora', serif;
+    color: #5D4E37;
+    font-weight: 600;
+}
+
+/* Links */
+a {
+    font-family: 'Open Sans', sans-serif;
+    color: #8D7B68;
+    text-decoration: none;
+    transition: all 0.3s ease;
+}
+
+a:hover {
+    color: #6F6356;
+    text-decoration: underline;
+}
+
+/* Navbar - Complete Styling */
+.navbar {
+    font-family: 'Open Sans', sans-serif;
+}
+
+.navbar-brand {
+    font-family: 'Merriweather', serif !important;
+    font-weight: 700 !important;
+    font-size: 1.4rem !important;
+    color: #FFF8E7 !important;
+    letter-spacing: -0.01em;
+}
+
+.nav-link {
+    font-family: 'Open Sans', sans-serif !important;
+    font-weight: 500 !important;
+    font-size: 0.95rem;
+    color: #FFF8E7 !important;
+    transition: all 0.3s ease;
+    padding: 0.5rem 1rem !important;
+}
+
+.nav-link:hover {
+    background-color: rgba(255, 248, 231, 0.15) !important;
+    border-radius: 6px;
+    transform: translateY(-2px);
+    color: #FFFFFF !important;
+}
+
+/* Card Styling dengan Paper Effect */
+.card {
+    background: linear-gradient(135deg, #FFFEF9 0%, #F5EEDC 100%);
+    border: 1px solid #CBB279;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(141, 123, 104, 0.15);
+    transition: all 0.3s ease;
+}
+
+.card:hover {
+    box-shadow: 0 8px 24px rgba(141, 123, 104, 0.25);
+    transform: translateY(-4px);
+}
+
+.card-header {
+    background: linear-gradient(135deg, #CBB279 0%, #A49080 100%);
+    color: #FFF8E7 !important;
+    border-bottom: 2px solid #8D7B68;
+    font-family: 'Lora', serif !important;
+    font-weight: 600;
+    font-size: 1.1rem;
+}
+
+.card-title {
+    font-family: 'Merriweather', serif !important;
+    color: #5D4E37;
+    font-weight: 600;
+    font-size: 1.1rem;
+    margin-bottom: 0.5rem;
+}
+
+.card-text {
+    font-family: 'Open Sans', sans-serif;
+    color: #6F6356;
+    line-height: 1.6;
+}
+
+.card-body {
+    font-family: 'Open Sans', sans-serif;
+}
+
+/* Button Styling - All Types */
+.btn {
+    font-family: 'Open Sans', sans-serif !important;
+    font-weight: 600 !important;
+    padding: 0.65rem 1.5rem;
+    border-radius: 8px;
+    transition: all 0.3s ease;
+    letter-spacing: 0.02em;
+    font-size: 0.95rem;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, #8D7B68 0%, #A49080 100%);
+    border: none;
+    color: #FFF8E7 !important;
+    box-shadow: 0 3px 8px rgba(141, 123, 104, 0.3);
+}
+
+.btn-primary:hover {
+    background: linear-gradient(135deg, #6F6356 0%, #8D7B68 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(141, 123, 104, 0.4);
+    color: #FFFFFF !important;
+}
+
+.btn-success {
+    background: linear-gradient(135deg, #7A9D54 0%, #8FB573 100%);
+    border: none;
+    color: white !important;
+    box-shadow: 0 3px 8px rgba(122, 157, 84, 0.3);
+}
+
+.btn-success:hover {
+    background: linear-gradient(135deg, #5F7C42 0%, #7A9D54 100%);
+    transform: translateY(-2px);
+    color: white !important;
+}
+
+.btn-warning {
+    background: linear-gradient(135deg, #CBB279 0%, #D4C19C 100%);
+    border: none;
+    color: #5D4E37 !important;
+}
+
+.btn-warning:hover {
+    background: linear-gradient(135deg, #A49080 0%, #CBB279 100%);
+    transform: translateY(-2px);
+    color: #5D4E37 !important;
+}
+
+.btn-outline-secondary {
+    border: 2px solid #8D7B68;
+    color: #8D7B68 !important;
+    background: transparent;
+}
+
+.btn-outline-secondary:hover {
+    background: #8D7B68;
+    color: #FFF8E7 !important;
+}
+
+.btn-outline-danger {
+    border: 2px solid #B85C5C;
+    color: #B85C5C !important;
+}
+
+.btn-outline-danger:hover {
+    background: #B85C5C;
+    color: white !important;
+}
+
+.btn-sm {
+    font-size: 0.85rem;
+    padding: 0.4rem 1rem;
+}
+
+/* Form Elements - Complete */
+.form-label {
+    font-family: 'Merriweather', serif !important;
+    color: #5D4E37;
+    font-weight: 600;
+    font-size: 0.95rem;
+    margin-bottom: 0.5rem;
+}
+
+.form-control,
+.form-select,
+#searchInput,
+input[type="text"],
+input[type="email"],
+input[type="password"],
+textarea,
+select {
+    font-family: 'Open Sans', sans-serif !important;
+    border: 2px solid #CBB279;
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
+    background: #FFFEF9;
+    color: #4A4A4A;
+    transition: all 0.3s ease;
+    font-size: 0.95rem;
+}
+
+.form-control:focus,
+.form-select:focus,
+#searchInput:focus {
+    border-color: #8D7B68;
+    box-shadow: 0 0 0 0.2rem rgba(141, 123, 104, 0.25);
+    background: white;
+    outline: none;
+}
+
+.form-text {
+    font-family: 'Open Sans', sans-serif;
+    color: #8D7B68;
+    font-size: 0.85rem;
+}
+
+.form-check-label {
+    font-family: 'Open Sans', sans-serif;
+    color: #5D4E37;
+    font-size: 0.95rem;
+}
+
+.form-check-input:checked {
+    background-color: #8D7B68;
+    border-color: #8D7B68;
+}
+
+/* Rating Select Styling */
+.rating-select {
+    font-family: 'Open Sans', sans-serif !important;
+    border: 2px solid #CBB279;
+    border-radius: 6px;
+    background: #FFFEF9;
+    color: #5D4E37;
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+.rating-select:focus {
+    border-color: #8D7B68;
+    box-shadow: 0 0 0 0.2rem rgba(141, 123, 104, 0.2);
+}
+
+.rating-select option {
+    font-family: 'Open Sans', sans-serif;
+    padding: 0.5rem;
+}
+
+/* Book Details Container */
+.book-details-container {
+    background: linear-gradient(135deg, #FFFEF9 0%, #F9F5ED 100%);
+    border-left: 4px solid #CBB279;
+    padding: 0.75rem;
+    border-radius: 8px;
+    box-shadow: inset 0 2px 4px rgba(141, 123, 104, 0.1);
+}
+
+.book-detail-item {
+    font-family: 'Open Sans', sans-serif;
+    font-size: 0.85rem;
+}
+
+.detail-label {
+    color: #5D4E37;
+    font-weight: 600;
+    font-family: 'Lora', serif !important;
+    font-size: 0.85rem;
+}
+
+.detail-value {
+    color: #6F6356;
+    font-family: 'Open Sans', sans-serif;
+    font-size: 0.85rem;
+}
+
+.isbn-value {
+    font-family: 'Courier New', monospace !important;
+    font-size: 0.8rem;
+}
+
+/* Search Result Cards */
+.search-result-card {
+    background: linear-gradient(135deg, #FFFEF9 0%, #F5EEDC 100%);
+    border: 2px solid #CBB279;
+    border-radius: 12px;
+    transition: all 0.3s ease;
+}
+
+.search-result-card:hover {
+    border-color: #8D7B68;
+    box-shadow: 0 6px 20px rgba(141, 123, 104, 0.25);
+    transform: translateY(-3px);
+}
+
+.search-book-title {
+    color: #5D4E37;
+    font-family: 'Merriweather', serif !important;
+    font-weight: 600;
+    font-size: 1.05rem;
+    line-height: 1.3;
+}
+
+.search-book-author {
+    font-family: 'Open Sans', sans-serif;
+    color: #8D7B68;
+    font-size: 0.9rem;
+}
+
+/* Recommendation Cards */
+.recommendation-card {
+    background: linear-gradient(135deg, #FFFEF9 0%, #F5EEDC 100%);
+    border: 2px solid #CBB279;
+    border-radius: 12px;
+}
+
+.recommendation-card:hover {
+    border-color: #8D7B68;
+    box-shadow: 0 8px 24px rgba(141, 123, 104, 0.3);
+}
+
+.recommendation-card .card-header {
+    background: linear-gradient(135deg, #E8DCC4 0%, #D4C19C 100%);
+    color: #5D4E37 !important;
+    font-family: 'Open Sans', sans-serif;
+    font-size: 0.85rem;
+}
+
+.recommendation-card .card-title {
+    font-family: 'Merriweather', serif !important;
+    font-size: 1rem;
+}
+
+/* Badge Styling */
+.badge {
+    font-family: 'Open Sans', sans-serif !important;
+    font-weight: 600;
+    padding: 0.5em 0.85em;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    letter-spacing: 0.02em;
+}
+
+.badge.bg-success {
+    background: linear-gradient(135deg, #7A9D54 0%, #8FB573 100%) !important;
+    color: white !important;
+}
+
+.badge.bg-warning {
+    background: linear-gradient(135deg, #CBB279 0%, #D4C19C 100%) !important;
+    color: #5D4E37 !important;
+}
+
+.badge.bg-primary {
+    background: linear-gradient(135deg, #8D7B68 0%, #A49080 100%) !important;
+    color: #FFF8E7 !important;
+}
+
+.badge.bg-info {
+    background: linear-gradient(135deg, #7FA5BF 0%, #9BB8CC 100%) !important;
+    color: white !important;
+}
+
+.badge.bg-secondary {
+    background: linear-gradient(135deg, #A49080 0%, #8D7B68 100%) !important;
+    color: #FFF8E7 !important;
+}
+
+.badge.bg-light {
+    background: #F5EEDC !important;
+    color: #5D4E37 !important;
+    border: 1px solid #CBB279;
+}
+
+/* Alert Styling */
+.alert {
+    border-radius: 10px;
+    border: 2px solid;
+    font-family: 'Open Sans', sans-serif;
+    font-size: 0.95rem;
+}
+
+.alert-success {
+    background: linear-gradient(135deg, #E8F5E9 0%, #C8E6C9 100%);
+    border-color: #7A9D54;
+    color: #2E5020;
+}
+
+.alert-info {
+    background: linear-gradient(135deg, #E3F2FD 0%, #BBDEFB 100%);
+    border-color: #7FA5BF;
+    color: #1E4D6B;
+}
+
+.alert-warning {
+    background: linear-gradient(135deg, #FFF9E6 0%, #FFE5B4 100%);
+    border-color: #CBB279;
+    color: #5D4E37;
+}
+
+.alert-danger {
+    background: linear-gradient(135deg, #FFEBEE 0%, #FFCDD2 100%);
+    border-color: #B85C5C;
+    color: #8B3A3A;
+}
+
+.alert strong {
+    font-family: 'Lora', serif;
+    font-weight: 600;
+}
+
+/* List Group */
+.list-group-item {
+    background: linear-gradient(135deg, #FFFEF9 0%, #F9F5ED 100%);
+    border: 1px solid #CBB279;
+    margin-bottom: 0.5rem;
+    border-radius: 8px;
+    transition: all 0.3s ease;
+    font-family: 'Open Sans', sans-serif;
+}
+
+.list-group-item:hover {
+    background: linear-gradient(135deg, #F9F5ED 0%, #F5EEDC 100%);
+    border-color: #8D7B68;
+    transform: translateX(5px);
+}
+
+.list-group-item h6 {
+    font-family: 'Merriweather', serif !important;
+    font-size: 0.95rem;
+}
+
+/* Empty State Styling */
+.search-empty-state {
+    background: linear-gradient(135deg, #F9F5ED 0%, #E8DCC4 100%);
+    border: 3px dashed #CBB279;
+    border-radius: 16px;
+    color: #8D7B68;
+    font-family: 'Open Sans', sans-serif;
+}
+
+.search-empty-state i {
+    color: #CBB279;
+}
+
+.search-empty-state p {
+    font-family: 'Lora', serif;
+    font-size: 1.1rem;
+    color: #6F6356;
+}
+
+/* Book Cover Placeholder */
+.no-cover-placeholder,
+.no-cover-placeholder-small {
+    background: linear-gradient(135deg, #F5EEDC 0%, #E8DCC4 100%);
+    border: 2px dashed #CBB279;
+    color: #8D7B68;
+    font-family: 'Open Sans', sans-serif;
+}
+
+.no-cover-placeholder small,
+.no-cover-placeholder-small small {
+    font-family: 'Open Sans', sans-serif;
+    font-size: 0.8rem;
+}
+
+/* Progress Bar untuk Confidence */
+.progress {
+    background-color: #E8DCC4;
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.progress-bar {
+    transition: width 0.6s ease;
+    font-family: 'Open Sans', sans-serif;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.confidence-bar-label {
+    font-family: 'Lora', serif;
+    color: #6F6356;
+    font-weight: 600;
+    font-size: 0.85rem;
+}
+
+/* Table Styling */
+table {
+    font-family: 'Open Sans', sans-serif;
+}
+
+th {
+    font-family: 'Lora', serif !important;
+    color: #5D4E37;
+    font-weight: 600;
+    background: linear-gradient(135deg, #E8DCC4 0%, #D4C19C 100%);
+}
+
+td {
+    font-family: 'Open Sans', sans-serif;
+    color: #4A4A4A;
+}
+
+/* Scrollbar Styling */
+::-webkit-scrollbar {
+    width: 10px;
+}
+
+::-webkit-scrollbar-track {
+    background: #F5EEDC;
+    border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: linear-gradient(135deg, #CBB279 0%, #A49080 100%);
+    border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(135deg, #8D7B68 0%, #6F6356 100%);
+}
+
+/* Loading Spinner */
+.spinner-border {
+    color: #8D7B68;
+}
+
+/* Icon Styling */
+i, .fas, .fa {
+    font-style: normal;
+}
+
+/* Responsive Typography */
+@media (max-width: 992px) {
+    h1 { font-size: 1.9rem; }
+    h2 { font-size: 1.6rem; }
+    h3 { font-size: 1.4rem; }
+    h4 { font-size: 1.2rem; }
+    h5 { font-size: 1.05rem; }
+    
+    .navbar-brand {
+        font-size: 1.2rem !important;
+    }
+    
+    .nav-link {
+        font-size: 0.9rem;
+    }
+    
+    .lead {
+        font-size: 1.1rem;
+    }
+}
+
+@media (max-width: 768px) {
+    h1 { font-size: 1.7rem; }
+    h2 { font-size: 1.5rem; }
+    
+    .card-title {
+        font-size: 1rem;
+    }
+    
+    .btn {
+        font-size: 0.9rem;
+        padding: 0.55rem 1.2rem;
+    }
+    
+    .form-control,
+    .form-select {
+        font-size: 0.9rem;
+    }
+}
+
+@media (max-width: 576px) {
+    h1 { font-size: 1.5rem; }
+    
+    .navbar-brand {
+        font-size: 1.1rem !important;
+    }
+    
+    .card-title {
+        font-size: 0.95rem;
+    }
+    
+    .lead {
+        font-size: 1rem;
+    }
+}
+
+.book-details-section {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid rgba(203, 178, 121, 0.2);
+}
+
+.detail-row {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.detail-label {
+    font-family: 'Lora', serif !important;
+    color: #5D4E37;
+    font-weight: 600;
+    font-size: 0.8rem;
+}
+
+.isbn-value {
+    font-family: 'Courier New', monospace !important;
+    color: #6F6356;
+    font-size: 0.8rem;
+}
+
+/* Recommendation Card - Ensure consistent height */
+.recommendation-card {
+    display: flex;
+    flex-direction: column;
+}
+
+.recommendation-card .card-body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Responsive adjustments untuk mobile */
+@media (max-width: 768px) {
+    .book-details-section {
+        gap: 0.4rem;
+        padding-top: 0.5rem;
+    }
+    
+    .detail-row {
+        font-size: 0.85rem;
+    }
+}
+
+@media (max-width: 576px) {
+    .book-details-section {
+        gap: 0.3rem;
+        padding-top: 0.5rem;
+    }
+    
+    .detail-label,
+    .isbn-value {
+        font-size: 0.75rem;
+    }
+}
+
+.rating-stars {
+    display: flex;
+    gap: 4px;
+    cursor: pointer;
+    user-select: none;
+    margin-top: 6px;
+}
+
+.rating-stars .star {
+    font-size: 1.25rem;
+    color: #CBB279;
+    opacity: 0.45;
+    transition: all 0.2s ease;
+}
+
+.rating-stars .star:hover {
+    transform: scale(1.15);
+    opacity: 0.65;
+}
+
+.rating-stars .star.active {
+    color: #F2C94C;
+    opacity: 1;
+    text-shadow: 0 0 6px rgba(242, 201, 76, 0.4);
+}
+
+.rating-stars .star.active:hover {
+    transform: scale(1.15);
+}
